@@ -17,7 +17,6 @@ const (
 
 // DB .
 type DB interface {
-	createIndexes()
 	Close() error
 	Reset() error
 
@@ -52,7 +51,10 @@ func Open() (DB, error) {
 		origin: origin,
 	}
 
-	new.createIndexes()
+	err = new.createIndexes()
+	if err != nil {
+		return nil, err
+	}
 
 	return &new, nil
 }
@@ -67,7 +69,6 @@ func (db *db) GetLastRecordTime() (int64, error) {
 		t = v
 		return nil
 	})
-
 	if err != nil {
 		return 0, err
 	}
@@ -97,14 +98,54 @@ func (db *db) Reset() error {
 	return db.origin.Shrink()
 }
 
-func (db *db) createIndexes() {
+func createDirectoryIndex(tx *buntdb.Tx, hash string) error {
+	return tx.CreateIndex(indexDirectorySpace(hash), patternDirectorySpace(hash), buntdb.IndexJSON("time"))
+}
+
+func createVolumeIndex(tx *buntdb.Tx, hash string) error {
+	return tx.CreateIndex(indexVolSpace(hash), patternVolumeSpace(hash), buntdb.IndexJSON("time"))
+}
+
+func (db *db) createIndexes() error {
 	for _, index := range indexes {
 		less := buntdb.IndexJSON(index.jsonKey)
 		if index.decending {
 			less = buntdb.Desc(less)
 		}
-		db.origin.CreateIndex(index.name, index.pattern, less)
+		err := db.origin.CreateIndex(index.name, index.pattern, less)
+		if err != nil {
+			return err
+		}
 	}
+
+	dhs, err := db.GetDirectories()
+	if err != nil {
+		return err
+	}
+
+	vhs, err := db.GetVolumes()
+	if err != nil {
+		return err
+	}
+
+	db.origin.Update(func(tx *buntdb.Tx) error {
+		for _, dh := range dhs {
+			err := createDirectoryIndex(tx, dh.Hash)
+			if err != nil {
+				return err
+			}
+		}
+		for _, vh := range vhs {
+			err := createVolumeIndex(tx, vh.Hash)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return nil
 }
 
 func (db *db) PutDirectory(dir string) error {
@@ -126,7 +167,7 @@ func (db *db) PutDirectory(dir string) error {
 		if err != nil {
 			return err
 		}
-		err = tx.CreateIndex(indexDirectorySpace(hash), patternDirectorySpace(hash), buntdb.IndexJSON("time"))
+		err = createDirectoryIndex(tx, hash)
 		return err
 	})
 }
@@ -180,7 +221,7 @@ func (db *db) PutVolume(vol string) error {
 		if err != nil {
 			return err
 		}
-		err = tx.CreateIndex(indexVolSpace(hash), patternVolumeSpace(hash), buntdb.IndexJSON("time"))
+		err = createVolumeIndex(tx, hash)
 		return err
 	})
 }
@@ -271,7 +312,6 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 
 		return nil
 	})
-
 	if err != nil {
 		return err
 	}
@@ -312,7 +352,8 @@ func (db *db) GetDirectorySpace(dir string, start, end int64) ([]model.Directory
 
 func (db *db) GetVolumeSpace(vol string, start, end int64) ([]model.VolumeSpace, error) {
 	spaces := []model.VolumeSpace{}
-	index, err := keyVolumeSpace(vol, "*")
+	hash, err := utils.HashPath(vol)
+	index := indexVolSpace(hash)
 	if err != nil {
 		return nil, err
 	}

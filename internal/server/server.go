@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -25,6 +26,14 @@ func Run(db database.DB) error {
 		return c.JSON(http.StatusOK, &s)
 	})
 
+	e.GET("/volumes", func(c echo.Context) error {
+		s, err := db.GetVolumes()
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(http.StatusOK, &s)
+	})
+
 	e.GET("/space/directory/:path", func(c echo.Context) error {
 		start, err := strconv.ParseInt(c.QueryParam("start"), 10, 64)
 		if err != nil {
@@ -34,7 +43,12 @@ func Run(db database.DB) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
-		path := c.Param("path")
+
+		b, err := base64.RawStdEncoding.DecodeString(c.Param("path"))
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		path := string(b)
 
 		s, err := db.GetDirectorySpace(path, start, end)
 		if err != nil {
@@ -53,7 +67,11 @@ func Run(db database.DB) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
-		path := c.Param("path")
+		b, err := base64.RawStdEncoding.DecodeString(c.Param("path"))
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		path := string(b)
 
 		s, err := db.GetVolumeSpace(path, start, end)
 		if err != nil {
