@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/ronbb/space/internal/model"
 	"github.com/ronbb/space/internal/utils"
@@ -31,6 +32,9 @@ type DB interface {
 
 	GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error)
 	GetVolumeSpace(vol string, start, end int64) ([]model.VolumeSpace, error)
+
+	GetLastRecordTime() (int64, error)
+	SetLastRecordTime(int64) error
 }
 
 type db struct {
@@ -51,6 +55,31 @@ func Open() (DB, error) {
 	new.createIndexes()
 
 	return &new, nil
+}
+
+func (db *db) GetLastRecordTime() (int64, error) {
+	t := "0"
+	err := db.origin.View(func(tx *buntdb.Tx) error {
+		v, err := tx.Get(keyLastRecordTime)
+		if err != nil {
+			return err
+		}
+		t = v
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.ParseInt(t, 10, 64)
+}
+
+func (db *db) SetLastRecordTime(t int64) error {
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		_, _, err := tx.Set(keyLastRecordTime, strconv.FormatInt(t, 10), nil)
+		return err
+	})
 }
 
 func (db *db) Close() error {
@@ -195,7 +224,7 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 	t := info.Time
 	tStr := fmt.Sprintf("%d", t)
 
-	return db.origin.Update(func(tx *buntdb.Tx) error {
+	err := db.origin.Update(func(tx *buntdb.Tx) error {
 		for _, dirSpace := range info.DirectoriesSpace {
 			dirSpace.Time = t
 			key, err := keyDirectorySpace(dirSpace.Directory, tStr)
@@ -242,6 +271,12 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	return db.SetLastRecordTime(t)
 }
 
 func (db *db) GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error) {
