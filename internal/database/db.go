@@ -1,6 +1,13 @@
 package database
 
-import "github.com/tidwall/buntdb"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"github.com/ronbb/space/internal/model"
+	"github.com/tidwall/buntdb"
+)
 
 const (
 	dbName = "data.db"
@@ -9,7 +16,20 @@ const (
 // DB .
 type DB interface {
 	createIndexes()
-	Test()
+	Close() error
+	Reset() error
+
+	PutDirectory(dir string) error
+	RemoveDirectory(dir string) error
+	GetDirectories() ([]model.DirectoryHash, error)
+	PutVolume(vol string) error
+	RemoveVolume(vol string) error
+	GetVolumes() ([]model.VolumeHash, error)
+
+	PutSpaceInfo(info model.SpaceInfo) error
+
+	GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error)
+	GetVolumeSpace(vol string, start, end int64) ([]model.VolumeSpace, error)
 }
 
 type db struct {
@@ -32,38 +52,15 @@ func Open() (DB, error) {
 	return &new, nil
 }
 
-type index struct {
-	name      string
-	pattern   string
-	jsonKey   string
-	decending bool
+func (db *db) Close() error {
+	return db.origin.Close()
 }
 
-var (
-	indexes = []index{
-		{
-			name:      "global.record",
-			pattern:   "global:record",
-			jsonKey:   "time",
-			decending: true,
-		},
-		{
-			name:    "dir.name",
-			pattern: "name:dir:*",
-			jsonKey: "name",
-		},
-		{
-			name:    "dir.time",
-			pattern: "space:dir:*:*",
-			jsonKey: "time",
-		},
-		{
-			name:    "vol.time",
-			pattern: "space:vol:*:*",
-			jsonKey: "time",
-		},
-	}
-)
+func (db *db) Reset() error {
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		return tx.DeleteAll()
+	})
+}
 
 func (db *db) createIndexes() {
 	for _, index := range indexes {
@@ -75,27 +72,218 @@ func (db *db) createIndexes() {
 	}
 }
 
-func (db *db) Test() {
-	db.origin.Update(func(tx *buntdb.Tx) error {
-		tx.Set("space:aaa:123", `{"time": 0}`, nil)
-		tx.Set("space:aab:124", `{"time": 1}`, nil)
-		tx.Set("space:aca:223", `{"time": 2}`, nil)
-		tx.Set("space:daa:133", `{"time": 7}`, nil)
+func (db *db) PutDirectory(dir string) error {
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		key, hash, err := keyDirectoryHash(dir)
+		if err != nil {
+			return err
+		}
+
+		value, err := json.Marshal(&model.DirectoryHash{
+			Directory: dir,
+			Hash:      hash,
+		})
+		if err != nil {
+			return err
+		}
+
+		tx.Set(key, string(value), nil)
 		return nil
 	})
+}
 
-	db.origin.View(func(tx *buntdb.Tx) error {
-		tx.Ascend("time", func(key, value string) bool {
-			println(key, value)
+func (db *db) RemoveDirectory(dir string) error {
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		key, _, err := keyDirectoryHash(dir)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Delete(key)
+		return err
+	})
+}
+
+func (db *db) GetDirectories() ([]model.DirectoryHash, error) {
+	dirs := []model.DirectoryHash{}
+
+	err := db.origin.View(func(tx *buntdb.Tx) error {
+		return tx.Ascend(indexDirectoryHash, func(key, value string) bool {
+			dir := model.DirectoryHash{}
+			err := json.Unmarshal([]byte(value), &dir)
+			if err != nil {
+				return true
+			}
+			dirs = append(dirs, dir)
 			return true
 		})
+	})
+
+	return dirs, err
+}
+
+func (db *db) PutVolume(vol string) error {
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		key, hash, err := keyVolumeHash(vol)
+		if err != nil {
+			return err
+		}
+
+		value, err := json.Marshal(&model.VolumeHash{
+			Volume: vol,
+			Hash:   hash,
+		})
+		if err != nil {
+			return err
+		}
+
+		tx.Set(key, string(value), nil)
+		return nil
+	})
+}
+
+func (db *db) RemoveVolume(vol string) error {
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		key, _, err := keyVolumeHash(vol)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Delete(key)
+		return err
+	})
+}
+
+func (db *db) GetVolumes() ([]model.VolumeHash, error) {
+	dirs := []model.VolumeHash{}
+
+	err := db.origin.View(func(tx *buntdb.Tx) error {
+		return tx.Ascend(indexVolumeHash, func(key, value string) bool {
+			dir := model.VolumeHash{}
+			err := json.Unmarshal([]byte(value), &dir)
+			if err != nil {
+				return true
+			}
+			dirs = append(dirs, dir)
+			return true
+		})
+	})
+
+	return dirs, err
+}
+
+func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
+	if info.DirectorirsSpace == nil || info.VolumesSpace == nil {
+		return errors.New("info.DirectorirsSpace or info.VolumesSpace is nil")
+	}
+
+	// aligned time
+	t := info.Time
+	tStr := fmt.Sprintf("%d", t)
+
+	return db.origin.Update(func(tx *buntdb.Tx) error {
+		for _, dirSpace := range info.DirectorirsSpace {
+			dirSpace.Time = t
+			key, err := keyDirectorySpace(dirSpace.Directory, tStr)
+			if err != nil {
+				return err
+			}
+
+			value, err := json.Marshal(&dirSpace)
+			if err != nil {
+				return err
+			}
+
+			tx.Set(key, string(value), &buntdb.SetOptions{
+				Expires: true,
+				TTL:     TTL,
+			})
+		}
+
+		for _, volSpace := range info.VolumesSpace {
+			volSpace.Time = t
+			key, err := keyVolumeSpace(volSpace.Volume, tStr)
+			if err != nil {
+				return err
+			}
+
+			value, err := json.Marshal(&volSpace)
+			if err != nil {
+				return err
+			}
+
+			tx.Set(key, string(value), &buntdb.SetOptions{
+				Expires: true,
+				TTL:     TTL,
+			})
+		}
 
 		return nil
 	})
+}
 
-	h1, _ := hash("C:\\1a")
-	h2, _ := hash("C:\\1b")
-	
-	println("hash", h1, h2)
+func (db *db) GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error) {
+	spaces := []model.DirectorySpace{}
+	index, err := keyDirectorySpace(dir, "*")
+	if err != nil {
+		return nil, err
+	}
 
+	startJSON, err := timeJSON(start)
+	if err != nil {
+		return nil, err
+	}
+
+	endJSON, err := timeJSON(end)
+	if err != nil {
+		return nil, err
+	}
+
+	db.origin.View(func(tx *buntdb.Tx) error {
+		return tx.AscendRange(index, startJSON, endJSON, func(key, value string) bool {
+			space := model.DirectorySpace{}
+			err := json.Unmarshal([]byte(value), &space)
+			if err != nil {
+				return true
+			}
+
+			spaces = append(spaces, space)
+			return true
+		})
+	})
+
+	return spaces, err
+}
+
+func (db *db) GetVolumeSpace(vol string, start, end int64) ([]model.VolumeSpace, error) {
+	spaces := []model.VolumeSpace{}
+	index, err := keyVolumeSpace(vol, "*")
+	if err != nil {
+		return nil, err
+	}
+
+	startJSON, err := timeJSON(start)
+	if err != nil {
+		return nil, err
+	}
+
+	endJSON, err := timeJSON(end)
+	if err != nil {
+		return nil, err
+	}
+
+	db.origin.View(func(tx *buntdb.Tx) error {
+		return tx.AscendRange(index, startJSON, endJSON, func(key, value string) bool {
+			space := model.VolumeSpace{}
+			err := json.Unmarshal([]byte(value), &space)
+			if err != nil {
+				return true
+			}
+
+			spaces = append(spaces, space)
+			return true
+		})
+	})
+
+	return spaces, err
 }

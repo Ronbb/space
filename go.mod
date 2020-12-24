@@ -8,5 +8,5 @@ require (
 	github.com/tidwall/buntdb v1.1.5
 	github.com/tidwall/gjson v1.6.5 // indirect
 	github.com/tidwall/rtree v0.0.0-20201103190202-0d877048965d // indirect
-	golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
+	golang.org/x/sys v0.0.0-20201223074533-0d417f636930
 )

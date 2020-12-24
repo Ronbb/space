@@ -2,16 +2,17 @@ package main
 
 import (
 	"github.com/ronbb/space/internal/database"
-	"github.com/ronbb/space/internal/size"
+	"github.com/ronbb/space/internal/space"
 )
 
 func main() {
-	s, err := size.GetSpaceOfDir("C:\\Software\\ARCTIME_PRO_2.3_WIN64")
+	p := "C:\\old"
+	s, err := space.GetDirectorySpace(p)
 	if err != nil {
 		println(err.Error())
 		return
 	}
-	println("a", s)
+	println(p, s.UsedSpace, s.Percentage)
 
 	db, err := database.Open()
 	if err != nil {
@@ -19,6 +20,5 @@ func main() {
 		return
 	}
 
-	db.Test()
-
+	defer db.Close()
 }

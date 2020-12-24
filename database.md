@@ -12,6 +12,6 @@
 
 ## DB.RemoveVolume
 
-## DB.GetVolume
+## DB.GetVolumes
 
 ## DB.PutSpaceInfo
