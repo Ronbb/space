@@ -5,14 +5,19 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ronbb/space/internal/database"
+	"github.com/ronbb/space/internal/model"
 )
 
 var (
 	db   database.DB
 	dirs []string
 	vols []string
+
+	randNum = rand.Uint32() / 2
+	randAlp = rand.Intn(12)
 )
 
 func init() {
@@ -34,14 +39,16 @@ func init() {
 }
 
 func randDir() string {
-	return fmt.Sprintf("C:\\%d\\", rand.Int())
+	randNum += 1
+	return fmt.Sprintf("C:\\%d\\", randNum)
 }
 
 func randVol() string {
-	return fmt.Sprintf("%s:\\", string(rune(int('A')+rand.Intn(25))))
+	randAlp += 1
+	return fmt.Sprintf("%s:\\", string(rune(int('A')+randAlp)))
 }
 
-func TestPutDirectory(t *testing.T) {
+func TestDirectory(t *testing.T) {
 	t.Run("Put Directory", func(t *testing.T) {
 		for _, dir := range dirs {
 			err := db.PutDirectory(dir)
@@ -71,7 +78,155 @@ func TestPutDirectory(t *testing.T) {
 				t.Errorf("can not find %s", dir)
 			}
 		}
-	})      
+	})
+
+	t.Run("Remove Directory", func(t *testing.T) {
+		dir := dirs[rand.Intn(len(dirs))]
+		err := db.RemoveDirectory(dir)
+		if err != nil {
+			t.Error(err)
+		}
+
+		dhs, err := db.GetDirectories()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(dhs) != len(dirs)-1 {
+			t.Error("len(dhs) != len(dirs) - 1")
+		}
+	})
+}
+
+func TestVolume(t *testing.T) {
+	t.Run("Put Volume", func(t *testing.T) {
+		for _, vol := range vols {
+			err := db.PutVolume(vol)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	})
+
+	t.Run("Get Volume", func(t *testing.T) {
+		vhs, err := db.GetVolumes()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(vhs) != len(vols) {
+			t.Error("len(vhs) != len(vols)", len(vhs), len(vols))
+		}
+		for _, vol := range vols {
+			found := false
+			for _, vh := range vhs {
+				if vh.Volume == vol {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("can not find %s", vol)
+			}
+		}
+	})
+
+	t.Run("Remove Volume", func(t *testing.T) {
+		vol := vols[rand.Intn(len(vols))]
+		err := db.RemoveVolume(vol)
+		if err != nil {
+			t.Error(err)
+		}
+
+		vhs, err := db.GetVolumes()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(vhs) != len(vols)-1 {
+			t.Error("len(vhs) != len(vols) - 1")
+		}
+	})
+}
+
+func TestSpace(t *testing.T) {
+	t.Run("Put Space Info", func(t *testing.T) {
+		dhs, err := db.GetDirectories()
+		if err != nil {
+			t.Error(err)
+		}
+		vhs, err := db.GetVolumes()
+		if err != nil {
+			t.Error(err)
+		}
+
+		info := model.SpaceInfo{
+			Time:             time.Now().Unix(),
+			DirectoriesSpace: []model.DirectorySpace{},
+			VolumesSpace:     []model.VolumeSpace{},
+		}
+
+		for _, dh := range dhs {
+			info.DirectoriesSpace = append(info.DirectoriesSpace, model.DirectorySpace{
+				Directory:  dh.Directory,
+				UsedSpace:  rand.Uint64(),
+				Percentage: rand.Float64(),
+			})
+		}
+
+		for _, vh := range vhs {
+			info.VolumesSpace = append(info.VolumesSpace, model.VolumeSpace{
+				Volume:         vh.Volume,
+				AvailableSpace: rand.Uint64(),
+				TotalSpace:     rand.Uint64(),
+				FreeSpace:      rand.Uint64(),
+			})
+		}
+
+		db.PutSpaceInfo(info)
+	})
+
+	t.Run("Get Space", func(t *testing.T) {
+		dhs, err := db.GetDirectories()
+		if err != nil {
+			t.Error(err)
+		}
+		vhs, err := db.GetVolumes()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(dhs) == 0 || len(vhs) == 0 {
+			t.Error(len(dhs) == 0 || len(vhs) == 0)
+			return
+		}
+
+		dir := dhs[rand.Intn(len(dhs)-1)].Directory
+		sps, err := db.GetDirectorySpace(dir, time.Now().Unix() - 1e5, time.Now().Unix())
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(sps) == 0 {
+			t.Error("empty sps")
+			return
+		}
+
+		sp := sps[0]
+		t.Log(sp.Time, sp.Directory, sp.UsedSpace, sp.Percentage)
+	})
+}
+
+func TestClose(t *testing.T) {
+	err := db.Reset()
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	err = db.Close()
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
 }
 
 func TestMain(m *testing.M) {
@@ -81,19 +236,6 @@ func TestMain(m *testing.M) {
 		println(err.Error())
 		return
 	}
-
-	defer func() {
-		err = db.Reset()
-		if err != nil {
-			println(err.Error())
-			return
-		}
-		err = db.Close()
-		if err != nil {
-			println(err.Error())
-			return
-		}
-	}()
 
 	code := m.Run()
 	os.Exit(code)

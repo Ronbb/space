@@ -2,12 +2,12 @@ package model
 
 // DirectoryHash .
 type DirectoryHash struct {
-	Directory string
-	Hash      string
+	Directory string `json:"directory"`
+	Hash      string `json:"hash"`
 }
 
 // VolumeHash .
 type VolumeHash struct {
-	Volume string
-	Hash   string
+	Volume string `json:"volume"`
+	Hash   string `json:"hash"`
 }

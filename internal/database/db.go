@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ronbb/space/internal/model"
+	"github.com/ronbb/space/internal/utils"
 	"github.com/tidwall/buntdb"
 )
 
@@ -57,9 +58,14 @@ func (db *db) Close() error {
 }
 
 func (db *db) Reset() error {
-	return db.origin.Update(func(tx *buntdb.Tx) error {
+	err := db.origin.Update(func(tx *buntdb.Tx) error {
 		return tx.DeleteAll()
 	})
+	if err != nil {
+		return err
+	}
+
+	return db.origin.Shrink()
 }
 
 func (db *db) createIndexes() {
@@ -87,8 +93,12 @@ func (db *db) PutDirectory(dir string) error {
 			return err
 		}
 
-		tx.Set(key, string(value), nil)
-		return nil
+		_, _, err = tx.Set(key, string(value), nil)
+		if err != nil {
+			return err
+		}
+		err = tx.CreateIndex(indexDirectorySpace(hash), patternDirectorySpace(hash), buntdb.IndexJSON("time"))
+		return err
 	})
 }
 
@@ -137,8 +147,12 @@ func (db *db) PutVolume(vol string) error {
 			return err
 		}
 
-		tx.Set(key, string(value), nil)
-		return nil
+		_, _, err = tx.Set(key, string(value), nil)
+		if err != nil {
+			return err
+		}
+		err = tx.CreateIndex(indexVolSpace(hash), patternVolumeSpace(hash), buntdb.IndexJSON("time"))
+		return err
 	})
 }
 
@@ -173,7 +187,7 @@ func (db *db) GetVolumes() ([]model.VolumeHash, error) {
 }
 
 func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
-	if info.DirectorirsSpace == nil || info.VolumesSpace == nil {
+	if info.DirectoriesSpace == nil || info.VolumesSpace == nil {
 		return errors.New("info.DirectorirsSpace or info.VolumesSpace is nil")
 	}
 
@@ -182,7 +196,7 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 	tStr := fmt.Sprintf("%d", t)
 
 	return db.origin.Update(func(tx *buntdb.Tx) error {
-		for _, dirSpace := range info.DirectorirsSpace {
+		for _, dirSpace := range info.DirectoriesSpace {
 			dirSpace.Time = t
 			key, err := keyDirectorySpace(dirSpace.Directory, tStr)
 			if err != nil {
@@ -194,10 +208,14 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 				return err
 			}
 
-			tx.Set(key, string(value), &buntdb.SetOptions{
+			_, _, err = tx.Set(key, string(value), &buntdb.SetOptions{
 				Expires: true,
 				TTL:     TTL,
 			})
+
+			if err != nil {
+				return err
+			}
 		}
 
 		for _, volSpace := range info.VolumesSpace {
@@ -212,10 +230,14 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 				return err
 			}
 
-			tx.Set(key, string(value), &buntdb.SetOptions{
+			_, _, err = tx.Set(key, string(value), &buntdb.SetOptions{
 				Expires: true,
 				TTL:     TTL,
 			})
+
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -224,10 +246,8 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 
 func (db *db) GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error) {
 	spaces := []model.DirectorySpace{}
-	index, err := keyDirectorySpace(dir, "*")
-	if err != nil {
-		return nil, err
-	}
+	hash, err := utils.HashPath(dir)
+	index := indexDirectorySpace(hash)
 
 	startJSON, err := timeJSON(start)
 	if err != nil {

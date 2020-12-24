@@ -35,17 +35,26 @@ const (
 // pattern
 var (
 	patternDirectoryHash  = pattern(keyTemplateDirectoryHash)
-	patternDirectorySpace = pattern(keyTemplateDirectorySpace)
 	patternVolumeHash     = pattern(keyTemplateVolumeHash)
-	patternVolumeSpace    = pattern(keyTemplateVolumeSpace)
 )
+
+func patternVolumeSpace(hash string) string {
+	return fmt.Sprintf(keyTemplateVolumeSpace, hash, "*")
+}
+
+func patternDirectorySpace(hash string) string {
+	return fmt.Sprintf(keyTemplateDirectorySpace, hash, "*")
+}
 
 // index name
 const (
-	indexDirectoryHash  = "dir.hash"
-	indexDirectorySpace = "dir.time"
-	indexVolumeHash     = "vol.hash"
-	indexVolumeSpace    = "vol.time"
+	indexDirectoryHash = "dir.hash"
+	indexVolumeHash    = "vol.hash"
+)
+
+const (
+	indexTemplateDirectorySpace = "dir.time.%s"
+	indexTemplateVolumeSpace    = "vol.time.%s"
 )
 
 var indexes = []index{
@@ -56,20 +65,9 @@ var indexes = []index{
 		decending: true,
 	},
 	{
-		name:    indexDirectorySpace,
-		pattern: patternDirectorySpace,
-		jsonKey: "time",
-	},
-	{
 		name:      indexVolumeHash,
 		pattern:   patternVolumeHash,
 		jsonKey:   "hash",
-		decending: true,
-	},
-	{
-		name:      indexVolumeSpace,
-		pattern:   patternVolumeSpace,
-		jsonKey:   "time",
 		decending: true,
 	},
 }
@@ -112,6 +110,14 @@ func keyVolumeSpace(dir string, time string) (key string, err error) {
 	}
 	key = fmt.Sprintf(keyTemplateVolumeSpace, h, time)
 	return
+}
+
+func indexDirectorySpace(hash string) string {
+	return fmt.Sprintf(indexTemplateDirectorySpace, hash)
+}
+
+func indexVolSpace(hash string) string {
+	return fmt.Sprintf(indexTemplateVolumeSpace, hash)
 }
 
 func timeJSON(t interface{}) (string, error) {
