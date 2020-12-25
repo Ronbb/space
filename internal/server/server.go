@@ -1,8 +1,6 @@
 package server
 
 import (
-	"encoding/base64"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -34,7 +32,7 @@ func Run(db database.DB) error {
 		return c.JSON(http.StatusOK, &s)
 	})
 
-	e.GET("/space/directory/:path", func(c echo.Context) error {
+	e.GET("/space/directory", func(c echo.Context) error {
 		start, err := strconv.ParseInt(c.QueryParam("start"), 10, 64)
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
@@ -44,11 +42,7 @@ func Run(db database.DB) error {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
 
-		b, err := base64.RawStdEncoding.DecodeString(c.Param("path"))
-		if err != nil {
-			return c.String(http.StatusBadRequest, err.Error())
-		}
-		path := string(b)
+		path := c.QueryParam("path")
 
 		s, err := db.GetDirectorySpace(path, start, end)
 		if err != nil {
@@ -58,7 +52,7 @@ func Run(db database.DB) error {
 		return c.JSON(http.StatusOK, &s)
 	})
 
-	e.GET("/space/volume/:path", func(c echo.Context) error {
+	e.GET("/space/volume", func(c echo.Context) error {
 		start, err := strconv.ParseInt(c.QueryParam("start"), 10, 64)
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
@@ -67,11 +61,7 @@ func Run(db database.DB) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
-		b, err := base64.RawStdEncoding.DecodeString(c.Param("path"))
-		if err != nil {
-			return c.String(http.StatusBadRequest, err.Error())
-		}
-		path := string(b)
+		path := c.QueryParam("path")
 
 		s, err := db.GetVolumeSpace(path, start, end)
 		if err != nil {
@@ -81,13 +71,13 @@ func Run(db database.DB) error {
 		return c.JSON(http.StatusOK, &s)
 	})
 
-	e.GET("/last_record_time", func(c echo.Context) error {
-		t, err := db.GetLastRecordTime()
+	e.GET("/last_record", func(c echo.Context) error {
+		record, err := db.GetLastRecord()
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
 
-		return c.String(http.StatusOK, fmt.Sprintf("%d", t))
+		return c.JSON(http.StatusOK, &record)
 	})
 
 	e.PUT("/directory", func(c echo.Context) error {

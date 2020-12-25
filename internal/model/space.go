@@ -17,8 +17,8 @@ type DirectorySpace struct {
 	Percentage float64 `json:"percentage"`
 }
 
-// SpaceInfo .
-type SpaceInfo struct {
+// SpaceRecord .
+type SpaceRecord struct {
 	Time             int64            `json:"time"` // unix second
 	DirectoriesSpace []DirectorySpace `json:"directoriesSpace"`
 	VolumesSpace     []VolumeSpace    `json:"volumesSpace"`

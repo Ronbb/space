@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"path/filepath"
 
 	"github.com/ronbb/space/internal/model"
 	"github.com/ronbb/space/internal/utils"
@@ -27,13 +27,12 @@ type DB interface {
 	RemoveVolume(vol string) error
 	GetVolumes() ([]model.VolumeHash, error)
 
-	PutSpaceInfo(info model.SpaceInfo) error
+	PutLastRecord(info model.SpaceRecord) error
 
 	GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error)
 	GetVolumeSpace(vol string, start, end int64) ([]model.VolumeSpace, error)
 
-	GetLastRecordTime() (int64, error)
-	SetLastRecordTime(int64) error
+	GetLastRecord() (model.SpaceRecord, error)
 }
 
 type db struct {
@@ -59,29 +58,28 @@ func Open() (DB, error) {
 	return &new, nil
 }
 
-func (db *db) GetLastRecordTime() (int64, error) {
-	t := "0"
+func (db *db) GetLastRecord() (model.SpaceRecord, error) {
+	record := model.SpaceRecord{}
 	err := db.origin.View(func(tx *buntdb.Tx) error {
-		v, err := tx.Get(keyLastRecordTime)
+		v, err := tx.Get(keyLastRecord)
 		if err != nil {
 			return err
 		}
-		t = v
-		return nil
+		return json.Unmarshal([]byte(v), &record)
 	})
 	if err != nil {
-		return 0, err
+		return record, err
 	}
 
-	return strconv.ParseInt(t, 10, 64)
+	return record, nil
 }
 
-func (db *db) SetLastRecordTime(t int64) error {
-	return db.origin.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set(keyLastRecordTime, strconv.FormatInt(t, 10), nil)
-		return err
-	})
-}
+// func (db *db) SetLastRecordTime(t int64) error {
+// 	return db.origin.Update(func(tx *buntdb.Tx) error {
+// 		_, _, err := tx.Set(keyLastRecordTime, strconv.FormatInt(t, 10), nil)
+// 		return err
+// 	})
+// }
 
 func (db *db) Close() error {
 	return db.origin.Close()
@@ -203,6 +201,7 @@ func (db *db) GetDirectories() ([]model.DirectoryHash, error) {
 }
 
 func (db *db) PutVolume(vol string) error {
+	vol = filepath.VolumeName(vol) + "\\"
 	return db.origin.Update(func(tx *buntdb.Tx) error {
 		key, hash, err := keyVolumeHash(vol)
 		if err != nil {
@@ -256,17 +255,17 @@ func (db *db) GetVolumes() ([]model.VolumeHash, error) {
 	return dirs, err
 }
 
-func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
-	if info.DirectoriesSpace == nil || info.VolumesSpace == nil {
+func (db *db) PutLastRecord(record model.SpaceRecord) error {
+	if record.DirectoriesSpace == nil || record.VolumesSpace == nil {
 		return errors.New("info.DirectorirsSpace or info.VolumesSpace is nil")
 	}
 
 	// aligned time
-	t := info.Time
+	t := record.Time
 	tStr := fmt.Sprintf("%d", t)
 
 	err := db.origin.Update(func(tx *buntdb.Tx) error {
-		for _, dirSpace := range info.DirectoriesSpace {
+		for _, dirSpace := range record.DirectoriesSpace {
 			dirSpace.Time = t
 			key, err := keyDirectorySpace(dirSpace.Directory, tStr)
 			if err != nil {
@@ -288,7 +287,7 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 			}
 		}
 
-		for _, volSpace := range info.VolumesSpace {
+		for _, volSpace := range record.VolumesSpace {
 			volSpace.Time = t
 			key, err := keyVolumeSpace(volSpace.Volume, tStr)
 			if err != nil {
@@ -310,13 +309,22 @@ func (db *db) PutSpaceInfo(info model.SpaceInfo) error {
 			}
 		}
 
+		b, err := json.Marshal(&record)
+		if err != nil {
+			return err
+		}
+		tx.Set(keyLastRecord, string(b), &buntdb.SetOptions{
+			Expires: true,
+			TTL:     TTL,
+		})
+
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	return db.SetLastRecordTime(t)
+	return nil
 }
 
 func (db *db) GetDirectorySpace(dir string, start, end int64) ([]model.DirectorySpace, error) {

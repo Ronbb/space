@@ -21,7 +21,7 @@ const TTL = time.Hour * 24 * 30
 
 // key
 const (
-	keyLastRecordTime = "global.last.record"
+	keyLastRecord = "global.last.record"
 )
 
 // template key

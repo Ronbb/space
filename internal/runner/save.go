@@ -10,14 +10,14 @@ import (
 
 // value 1
 const (
-	SaveDuration = 10 * time.Second
+	SaveDuration = 10 * time.Minute
 )
 
 // SaveSpace .
 func SaveSpace(db database.DB, fn func(error)) {
 	for {
-		last, _ := db.GetLastRecordTime()
-		next := last + int64(SaveDuration.Seconds())
+		last, _ := db.GetLastRecord()
+		next := last.Time + int64(SaveDuration.Seconds())
 		now := time.Now().Unix()
 		duration := int64(1)
 		if next > now {
@@ -41,7 +41,7 @@ func save(db database.DB) error {
 		return err
 	}
 
-	info := model.SpaceInfo{
+	info := model.SpaceRecord{
 		Time:             time.Now().Unix(),
 		DirectoriesSpace: []model.DirectorySpace{},
 		VolumesSpace:     []model.VolumeSpace{},
@@ -63,5 +63,5 @@ func save(db database.DB) error {
 		info.VolumesSpace = append(info.VolumesSpace, s)
 	}
 
-	return db.PutSpaceInfo(info)
+	return db.PutLastRecord(info)
 }

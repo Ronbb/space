@@ -159,7 +159,7 @@ func TestSpace(t *testing.T) {
 			t.Error(err)
 		}
 
-		info := model.SpaceInfo{
+		info := model.SpaceRecord{
 			Time:             time.Now().Unix(),
 			DirectoriesSpace: []model.DirectorySpace{},
 			VolumesSpace:     []model.VolumeSpace{},
@@ -182,7 +182,7 @@ func TestSpace(t *testing.T) {
 			})
 		}
 
-		db.PutSpaceInfo(info)
+		db.PutLastRecord(info)
 	})
 
 	t.Run("Get Space", func(t *testing.T) {
