@@ -7,6 +7,7 @@ type VolumeSpace struct {
 	AvailableSpace uint64 `json:"availableSpace"`
 	TotalSpace     uint64 `json:"totalSpace"`
 	FreeSpace      uint64 `json:"freeSpace"`
+	Limit          int64  `json:"limit"`
 }
 
 // DirectorySpace .
@@ -15,6 +16,7 @@ type DirectorySpace struct {
 	Directory  string  `json:"directory"`
 	UsedSpace  uint64  `json:"usedSpace"`
 	Percentage float64 `json:"percentage"`
+	Limit      int64   `json:"limit"`
 }
 
 // SpaceRecord .

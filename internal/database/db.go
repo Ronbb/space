@@ -20,10 +20,10 @@ type DB interface {
 	Close() error
 	Reset() error
 
-	PutDirectory(dir string) error
+	PutDirectory(dir string, limit int64) error
 	RemoveDirectory(dir string) error
 	GetDirectories() ([]model.DirectoryHash, error)
-	PutVolume(vol string) error
+	PutVolume(vol string, limit int64) error
 	RemoveVolume(vol string) error
 	GetVolumes() ([]model.VolumeHash, error)
 
@@ -146,7 +146,7 @@ func (db *db) createIndexes() error {
 	return nil
 }
 
-func (db *db) PutDirectory(dir string) error {
+func (db *db) PutDirectory(dir string, limit int64) error {
 	return db.origin.Update(func(tx *buntdb.Tx) error {
 		key, hash, err := keyDirectoryHash(dir)
 		if err != nil {
@@ -156,6 +156,7 @@ func (db *db) PutDirectory(dir string) error {
 		value, err := json.Marshal(&model.DirectoryHash{
 			Directory: dir,
 			Hash:      hash,
+			Limit:     limit,
 		})
 		if err != nil {
 			return err
@@ -172,12 +173,16 @@ func (db *db) PutDirectory(dir string) error {
 
 func (db *db) RemoveDirectory(dir string) error {
 	return db.origin.Update(func(tx *buntdb.Tx) error {
-		key, _, err := keyDirectoryHash(dir)
+		key, hash, err := keyDirectoryHash(dir)
 		if err != nil {
 			return err
 		}
 
 		_, err = tx.Delete(key)
+		if err != nil {
+			return err
+		}
+		err = tx.DropIndex(indexDirectorySpace(hash))
 		return err
 	})
 }
@@ -200,7 +205,7 @@ func (db *db) GetDirectories() ([]model.DirectoryHash, error) {
 	return dirs, err
 }
 
-func (db *db) PutVolume(vol string) error {
+func (db *db) PutVolume(vol string, limit int64) error {
 	vol = filepath.VolumeName(vol) + "\\"
 	return db.origin.Update(func(tx *buntdb.Tx) error {
 		key, hash, err := keyVolumeHash(vol)
@@ -211,6 +216,7 @@ func (db *db) PutVolume(vol string) error {
 		value, err := json.Marshal(&model.VolumeHash{
 			Volume: vol,
 			Hash:   hash,
+			Limit:  limit,
 		})
 		if err != nil {
 			return err
@@ -227,12 +233,16 @@ func (db *db) PutVolume(vol string) error {
 
 func (db *db) RemoveVolume(vol string) error {
 	return db.origin.Update(func(tx *buntdb.Tx) error {
-		key, _, err := keyVolumeHash(vol)
+		key, hash, err := keyVolumeHash(vol)
 		if err != nil {
 			return err
 		}
 
 		_, err = tx.Delete(key)
+		if err != nil {
+			return err
+		}
+		err = tx.DropIndex(indexVolSpace(hash))
 		return err
 	})
 }

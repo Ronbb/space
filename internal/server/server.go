@@ -87,7 +87,7 @@ func Run(db database.DB) error {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
 
-		err = db.PutDirectory(v.Directory)
+		err = db.PutDirectory(v.Directory, v.Limit)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
@@ -102,7 +102,37 @@ func Run(db database.DB) error {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
 
-		err = db.PutVolume(v.Volume)
+		err = db.PutVolume(v.Volume, v.Limit)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+
+		return c.String(http.StatusOK, "success")
+	})
+
+	e.DELETE("/directory", func(c echo.Context) error {
+		v := model.DirectoryHash{}
+		err := c.Bind(&v)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+
+		err = db.RemoveDirectory(v.Directory)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+
+		return c.String(http.StatusOK, "success")
+	})
+
+	e.DELETE("/volume", func(c echo.Context) error {
+		v := model.VolumeHash{}
+		err := c.Bind(&v)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+
+		err = db.RemoveVolume(v.Volume)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}

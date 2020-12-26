@@ -51,7 +51,7 @@ func randVol() string {
 func TestDirectory(t *testing.T) {
 	t.Run("Put Directory", func(t *testing.T) {
 		for _, dir := range dirs {
-			err := db.PutDirectory(dir)
+			err := db.PutDirectory(dir, 0)
 			if err != nil {
 				t.Error(err)
 			}
@@ -101,7 +101,7 @@ func TestDirectory(t *testing.T) {
 func TestVolume(t *testing.T) {
 	t.Run("Put Volume", func(t *testing.T) {
 		for _, vol := range vols {
-			err := db.PutVolume(vol)
+			err := db.PutVolume(vol, 0)
 			if err != nil {
 				t.Error(err)
 			}
