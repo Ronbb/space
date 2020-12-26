@@ -62,6 +62,7 @@ func save(db database.DB) (*model.SpaceRecord, error) {
 			return nil, err
 		}
 		s.Limit = vh.Limit
+		s.LimitPercentage = vh.LimitPercentage
 		record.VolumesSpace = append(record.VolumesSpace, s)
 	}
 

@@ -23,7 +23,7 @@ type DB interface {
 	PutDirectory(dir string, limit int64) error
 	RemoveDirectory(dir string) error
 	GetDirectories() ([]model.DirectoryHash, error)
-	PutVolume(vol string, limit int64) error
+	PutVolume(vol string, limit int64, isPercentage bool) error
 	RemoveVolume(vol string) error
 	GetVolumes() ([]model.VolumeHash, error)
 
@@ -33,6 +33,7 @@ type DB interface {
 	GetVolumeSpace(vol string, start, end int64) ([]model.VolumeSpace, error)
 
 	GetLastRecord() (model.SpaceRecord, error)
+	GetRecords() ([]model.SpaceRecord, error)
 }
 
 type db struct {
@@ -72,6 +73,22 @@ func (db *db) GetLastRecord() (model.SpaceRecord, error) {
 	}
 
 	return record, nil
+}
+
+func (db *db) GetRecords() ([]model.SpaceRecord, error) {
+	records := []model.SpaceRecord{}
+	err := db.origin.View(func(tx *buntdb.Tx) error {
+		return tx.Ascend(indexRecord, func(key, value string) bool {
+			record := model.SpaceRecord{}
+			err := json.Unmarshal([]byte(value), &record)
+			if err == nil {
+				records = append(records, record)
+			}
+			return true
+		})
+	})
+
+	return records, err
 }
 
 // func (db *db) SetLastRecordTime(t int64) error {
@@ -205,7 +222,7 @@ func (db *db) GetDirectories() ([]model.DirectoryHash, error) {
 	return dirs, err
 }
 
-func (db *db) PutVolume(vol string, limit int64) error {
+func (db *db) PutVolume(vol string, limit int64, isPercentage bool) error {
 	vol = filepath.VolumeName(vol) + "\\"
 	return db.origin.Update(func(tx *buntdb.Tx) error {
 		key, hash, err := keyVolumeHash(vol)
@@ -214,9 +231,10 @@ func (db *db) PutVolume(vol string, limit int64) error {
 		}
 
 		value, err := json.Marshal(&model.VolumeHash{
-			Volume: vol,
-			Hash:   hash,
-			Limit:  limit,
+			Volume:          vol,
+			Hash:            hash,
+			Limit:           limit,
+			LimitPercentage: isPercentage,
 		})
 		if err != nil {
 			return err
@@ -323,12 +341,22 @@ func (db *db) PutLastRecord(record model.SpaceRecord) error {
 		if err != nil {
 			return err
 		}
-		tx.Set(keyLastRecord, string(b), &buntdb.SetOptions{
+
+		_, _, err = tx.Set(keyLastRecord, string(b), &buntdb.SetOptions{
 			Expires: true,
 			TTL:     TTL,
 		})
 
-		return nil
+		if err != nil {
+			return err
+		}
+
+		_, _, err = tx.Set(keyRecord(tStr), string(b), &buntdb.SetOptions{
+			Expires: true,
+			TTL:     TTL,
+		})
+
+		return err
 	})
 	if err != nil {
 		return err

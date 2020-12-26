@@ -102,7 +102,7 @@ func Run(db database.DB) error {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
 
-		err = db.PutVolume(v.Volume, v.Limit)
+		err = db.PutVolume(v.Volume, v.Limit, v.LimitPercentage)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}

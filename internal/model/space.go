@@ -2,12 +2,13 @@ package model
 
 // VolumeSpace .
 type VolumeSpace struct {
-	Time           int64  `json:"time"` // unix second
-	Volume         string `json:"volume"`
-	AvailableSpace uint64 `json:"availableSpace"`
-	TotalSpace     uint64 `json:"totalSpace"`
-	FreeSpace      uint64 `json:"freeSpace"`
-	Limit          int64  `json:"limit"`
+	Time            int64  `json:"time"` // unix second
+	Volume          string `json:"volume"`
+	AvailableSpace  uint64 `json:"availableSpace"`
+	TotalSpace      uint64 `json:"totalSpace"`
+	FreeSpace       uint64 `json:"freeSpace"`
+	Limit           int64  `json:"limit"`
+	LimitPercentage bool   `json:"limitPercentage"`
 }
 
 // DirectorySpace .

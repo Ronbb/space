@@ -101,7 +101,7 @@ func TestDirectory(t *testing.T) {
 func TestVolume(t *testing.T) {
 	t.Run("Put Volume", func(t *testing.T) {
 		for _, vol := range vols {
-			err := db.PutVolume(vol, 0)
+			err := db.PutVolume(vol, 0, false)
 			if err != nil {
 				t.Error(err)
 			}
