@@ -21,7 +21,7 @@ const TTL = time.Hour * 24 * 30
 
 // key
 const (
-	keyLastRecordTime = "global.last.record"
+	keyLastRecord = "global.last.record"
 )
 
 // template key
@@ -30,12 +30,14 @@ const (
 	keyTemplateDirectorySpace = "space:dir:%s:%s" // hash:time
 	keyTemplateVolumeHash     = "hash:vol:%s"     // hash
 	keyTemplateVolumeSpace    = "space:vol:%s:%s" // hash:time
+	keyTemplateRecord         = "record:%s"       // time
 )
 
 // pattern
 var (
-	patternDirectoryHash  = pattern(keyTemplateDirectoryHash)
-	patternVolumeHash     = pattern(keyTemplateVolumeHash)
+	patternDirectoryHash = pattern(keyTemplateDirectoryHash)
+	patternVolumeHash    = pattern(keyTemplateVolumeHash)
+	patternRecord        = pattern(keyTemplateRecord)
 )
 
 func patternVolumeSpace(hash string) string {
@@ -50,6 +52,7 @@ func patternDirectorySpace(hash string) string {
 const (
 	indexDirectoryHash = "dir.hash"
 	indexVolumeHash    = "vol.hash"
+	indexRecord        = "record"
 )
 
 const (
@@ -68,6 +71,12 @@ var indexes = []index{
 		name:      indexVolumeHash,
 		pattern:   patternVolumeHash,
 		jsonKey:   "hash",
+		decending: true,
+	},
+	{
+		name:      indexRecord,
+		pattern:   patternRecord,
+		jsonKey:   "time",
 		decending: true,
 	},
 }
@@ -109,6 +118,11 @@ func keyVolumeSpace(dir string, time string) (key string, err error) {
 		return
 	}
 	key = fmt.Sprintf(keyTemplateVolumeSpace, h, time)
+	return
+}
+
+func keyRecord(time string) (key string) {
+	key = fmt.Sprintf(keyTemplateRecord, time)
 	return
 }
 

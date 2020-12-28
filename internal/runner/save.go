@@ -14,10 +14,10 @@ const (
 )
 
 // SaveSpace .
-func SaveSpace(db database.DB, fn func(error)) {
+func SaveSpace(db database.DB, fn func(*model.SpaceRecord, error)) {
 	for {
-		last, _ := db.GetLastRecordTime()
-		next := last + int64(SaveDuration.Seconds())
+		last, _ := db.GetLastRecord()
+		next := last.Time + int64(SaveDuration.Seconds())
 		now := time.Now().Unix()
 		duration := int64(1)
 		if next > now {
@@ -26,22 +26,22 @@ func SaveSpace(db database.DB, fn func(error)) {
 		timer := time.NewTimer(time.Second * time.Duration(duration))
 		<-timer.C
 		timer.Stop()
-		err := save(db)
-		fn(err)
+		record, err := save(db)
+		fn(record, err)
 	}
 }
 
-func save(db database.DB) error {
+func save(db database.DB) (*model.SpaceRecord, error) {
 	dhs, err := db.GetDirectories()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	vhs, err := db.GetVolumes()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	info := model.SpaceInfo{
+	record := model.SpaceRecord{
 		Time:             time.Now().Unix(),
 		DirectoriesSpace: []model.DirectorySpace{},
 		VolumesSpace:     []model.VolumeSpace{},
@@ -50,18 +50,21 @@ func save(db database.DB) error {
 	for _, dh := range dhs {
 		s, err := space.GetDirectorySpace(dh.Directory)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		info.DirectoriesSpace = append(info.DirectoriesSpace, s)
+		s.Limit = dh.Limit
+		record.DirectoriesSpace = append(record.DirectoriesSpace, s)
 	}
 
 	for _, vh := range vhs {
 		s, err := space.GetVolumeSpace(vh.Volume)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		info.VolumesSpace = append(info.VolumesSpace, s)
+		s.Limit = vh.Limit
+		s.LimitPercentage = vh.LimitPercentage
+		record.VolumesSpace = append(record.VolumesSpace, s)
 	}
 
-	return db.PutSpaceInfo(info)
+	return &record, db.PutLastRecord(record)
 }
