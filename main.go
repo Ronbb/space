@@ -10,6 +10,7 @@ import (
 	"github.com/ronbb/space/internal/model"
 	"github.com/ronbb/space/internal/runner"
 	"github.com/ronbb/space/internal/server"
+	"github.com/ronbb/space/internal/tree"
 	"gopkg.in/toast.v1"
 )
 
@@ -39,6 +40,21 @@ func main() {
 		ioutil.WriteFile("out.json", b, 0644)
 		return
 	}
+
+	t, err := tree.Open()
+	if err != nil {
+		panic(err)
+	}
+	err = t.Save()
+	if err != nil {
+		panic(err)
+	}
+	// s, err := t.GetSize("C:\\Autodesk\\Autodesk_3ds_Max_2020_EFGJKPS_Win_64bit\\CER\\")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// println(s)
+	// return
 
 	go runner.SaveSpace(db, func(record *model.SpaceRecord, e error) {
 		notification := toast.Notification{

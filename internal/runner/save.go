@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"flag"
 	"time"
 
 	"github.com/ronbb/space/internal/database"
@@ -9,15 +10,15 @@ import (
 )
 
 // value 1
-const (
-	SaveDuration = 10 * time.Second
+var (
+	SaveDuration = flag.Int64("period", 3600, "period")
 )
 
 // SaveSpace .
 func SaveSpace(db database.DB, fn func(*model.SpaceRecord, error)) {
 	for {
 		last, _ := db.GetLastRecord()
-		next := last.Time + int64(SaveDuration.Seconds())
+		next := last.Time + int64(*SaveDuration)
 		now := time.Now().Unix()
 		duration := int64(1)
 		if next > now {
