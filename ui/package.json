@@ -16,7 +16,7 @@
     "ahooks": "^2.9.3",
     "antd": "^4.9.4",
     "axios": "^0.21.1",
-    "electron": "^11.1.1",
+    "electron": "^18.3.7",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-scripts": "4.0.1",
