@@ -13,7 +13,7 @@ require (
 	github.com/tidwall/rtree v0.0.0-20201103190202-0d877048965d // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/net v0.0.0-20201224014010-6772e930b67b // indirect
-	golang.org/x/sys v0.0.0-20201223074533-0d417f636930
+	golang.org/x/sys v0.1.0
 	golang.org/x/text v0.3.4 // indirect
 	gopkg.in/toast.v1 v1.0.0-20180812000517-0a84660828b2
 )
